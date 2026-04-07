@@ -1,5 +1,6 @@
 import { useOAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
+import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
@@ -14,20 +15,25 @@ export const AuthScreen: React.FC = () => {
   const theme = getTheme(isDarkResolved('system', systemScheme));
   const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
   const [loading, setLoading] = useState(false);
+  const redirectUrl = useMemo(
+    () => AuthSession.makeRedirectUri({ path: 'oauth-native-callback' }),
+    []
+  );
 
   const onGooglePress = useCallback(async () => {
     try {
       setLoading(true);
-      const { createdSessionId, setActive } = await startOAuthFlow();
+      const { createdSessionId, setActive } = await startOAuthFlow({ redirectUrl });
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
       }
-    } catch {
-      Alert.alert('Login failed', 'Could not sign in with Google. Please try again.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Login failed', `Could not sign in with Google. Please try again.\n\n${message}`);
     } finally {
       setLoading(false);
     }
-  }, [startOAuthFlow]);
+  }, [redirectUrl, startOAuthFlow]);
 
   const buttonLabel = useMemo(
     () => (loading ? 'Connecting...' : 'Continue with Google'),
