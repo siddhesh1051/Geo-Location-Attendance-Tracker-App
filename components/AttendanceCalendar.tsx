@@ -27,9 +27,9 @@ export const AttendanceCalendar: React.FC<Props> = ({
   onMonthChange,
   onDayPress,
 }) => {
-  const start = monthStart(month);
-  const end = monthEnd(month);
-  const days = eachDay(start, end);
+  const start = useMemo(() => monthStart(month), [month]);
+  const end = useMemo(() => monthEnd(month), [month]);
+  const days = useMemo(() => eachDay(start, end), [start, end]);
   const todayISTKey = getTodayISTKey();
 
   const markedDates = useMemo(() => {

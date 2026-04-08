@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Circle, Marker } from 'react-native-maps';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { AppButton } from '../components/ui/AppButton';
 import { AppCard } from '../components/ui/AppCard';
@@ -47,56 +48,58 @@ export const SettingsScreen: React.FC = () => {
     { key: 'system', label: 'System', icon: 'phone-portrait-outline' },
   ];
 
-  useEffect(() => {
-    let active = true;
-    let watcher: Location.LocationSubscription | null = null;
-    const pushLog = (entry: string) => {
-      const stamp = new Date().toLocaleTimeString();
-      setEventLog((prev) => [`${stamp} - ${entry}`, ...prev].slice(0, 20));
-    };
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+      let watcher: Location.LocationSubscription | null = null;
+      const pushLog = (entry: string) => {
+        const stamp = new Date().toLocaleTimeString();
+        setEventLog((prev) => [`${stamp} - ${entry}`, ...prev].slice(0, 20));
+      };
 
-    const startWatch = async () => {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (!active) return;
-      if (permission.status !== 'granted') {
-        setLocationError('Foreground location permission denied.');
-        setLocationReady(true);
-        pushLog('Location permission denied.');
-        return;
-      }
-      pushLog('Location watch started.');
-
-      watcher = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.Balanced,
-          distanceInterval: 10,
-          timeInterval: 5000,
-        },
-        (loc) => {
-          if (!active) return;
-          setCurrentCoords({
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-          });
-          setLastUpdateAt(new Date().toLocaleTimeString());
-          setLocationError(null);
+      const startWatch = async () => {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (!active) return;
+        if (permission.status !== 'granted') {
+          setLocationError('Foreground location permission denied.');
           setLocationReady(true);
+          pushLog('Location permission denied.');
+          return;
         }
-      );
-    };
+        pushLog('Location watch started.');
 
-    startWatch().catch(() => {
-      if (!active) return;
-      setLocationError('Unable to start live location updates.');
-      setLocationReady(true);
-      pushLog('Failed to start location watch.');
-    });
+        watcher = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            distanceInterval: 10,
+            timeInterval: 5000,
+          },
+          (loc) => {
+            if (!active) return;
+            setCurrentCoords({
+              latitude: loc.coords.latitude,
+              longitude: loc.coords.longitude,
+            });
+            setLastUpdateAt(new Date().toLocaleTimeString());
+            setLocationError(null);
+            setLocationReady(true);
+          }
+        );
+      };
 
-    return () => {
-      active = false;
-      watcher?.remove();
-    };
-  }, []);
+      startWatch().catch(() => {
+        if (!active) return;
+        setLocationError('Unable to start live location updates.');
+        setLocationReady(true);
+        pushLog('Failed to start location watch.');
+      });
+
+      return () => {
+        active = false;
+        watcher?.remove();
+      };
+    }, [])
+  );
 
   const distanceMeters = useMemo(() => {
     if (!currentCoords) return null;
@@ -261,6 +264,7 @@ export const SettingsScreen: React.FC = () => {
                 <MapView
                   ref={mapRef}
                   style={styles.map}
+                  liteMode
                   initialRegion={{
                     latitude: currentCoords.latitude,
                     longitude: currentCoords.longitude,

@@ -1,5 +1,5 @@
 import 'react-native-reanimated';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { ClerkLoaded, ClerkProvider, SignedIn, SignedOut } from '@clerk/clerk-expo';
 import { NavigationContainer } from '@react-navigation/native';
@@ -26,14 +26,22 @@ const RootTabs = () => {
   const systemScheme = useColorScheme();
   const isDark = isDarkResolved(settings.themeMode, systemScheme);
   const theme = getTheme(isDark);
+  const trackingSignature = useMemo(
+    () =>
+      `${settings.officeLocation.latitude}:${settings.officeLocation.longitude}:${settings.officeLocation.radius}`,
+    [settings.officeLocation.latitude, settings.officeLocation.longitude, settings.officeLocation.radius]
+  );
+  const lastTrackingSignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
     configureNotifications();
   }, []);
 
   useEffect(() => {
+    if (lastTrackingSignatureRef.current === trackingSignature) return;
+    lastTrackingSignatureRef.current = trackingSignature;
     startAttendanceTracking(settings.officeLocation);
-  }, [settings.officeLocation]);
+  }, [settings.officeLocation, trackingSignature]);
 
   if (loading) {
     return (
@@ -62,6 +70,7 @@ const RootTabs = () => {
           },
           tabBarActiveTintColor: theme.text,
           tabBarInactiveTintColor: theme.mutedText,
+          freezeOnBlur: true,
           tabBarIcon: ({ color, size, focused }) => {
             const name =
               route.name === 'Home'
