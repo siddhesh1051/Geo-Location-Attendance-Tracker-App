@@ -71,12 +71,18 @@ export const clearDayStatus = async (dateKey: string): Promise<AttendanceMap> =>
 };
 
 export const autoMarkPresentToday = async (): Promise<AttendanceMap> => {
+  const result = await autoMarkPresentTodayOnce();
+  return result.records;
+};
+
+export const autoMarkPresentTodayOnce = async (): Promise<{ records: AttendanceMap; didMarkNow: boolean }> => {
   const key = toDateKey(new Date());
   const current = await getAttendance();
-  if (current[key]?.manual) return current;
+  if (current[key]?.manual) return { records: current, didMarkNow: false };
+  if (current[key]?.status === 'present') return { records: current, didMarkNow: false };
   current[key] = { status: 'present', manual: false, updatedAt: new Date().toISOString() };
   await saveAttendance(current);
-  return current;
+  return { records: current, didMarkNow: true };
 };
 
 export const applyDefaultWFHForPastWorkingDays = async (): Promise<AttendanceMap> => {

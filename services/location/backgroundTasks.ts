@@ -4,7 +4,7 @@ import * as TaskManager from 'expo-task-manager';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-import { autoMarkPresentToday } from '../../storage/attendanceStorage';
+import { autoMarkPresentTodayOnce } from '../../storage/attendanceStorage';
 import { GEOFENCE_TASK, LOCATION_TASK } from './constants';
 
 const isExpoGoAndroid = Platform.OS === 'android' && Constants.appOwnership === 'expo';
@@ -37,7 +37,8 @@ TaskManager.defineTask(GEOFENCE_TASK, async ({ data, error }) => {
   if (error) return;
   const event = data as { eventType?: number };
   if (event?.eventType !== Location.GeofencingEventType.Enter) return;
-  await autoMarkPresentToday();
+  const { didMarkNow } = await autoMarkPresentTodayOnce();
+  if (!didMarkNow) return;
   await notifyPresent();
 });
 
@@ -45,5 +46,5 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   if (error) return;
   const payload = data as { locations?: Location.LocationObject[] };
   if (!payload?.locations?.length) return;
-  await autoMarkPresentToday();
+  await autoMarkPresentTodayOnce();
 });
