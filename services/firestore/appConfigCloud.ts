@@ -1,4 +1,4 @@
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer, serverTimestamp, setDoc } from 'firebase/firestore';
 
 import { OFFICE_LOCATION } from '../location/constants';
 import { firestore } from '../firebase/firebase';
@@ -85,7 +85,8 @@ const normalizeOfficeLocation = (
 
 export const loadAppConfig = async (): Promise<AppConfig> => {
   try {
-    const snapshot = await getDoc(configRef);
+    // Prefer server value so admin-portal updates reflect immediately in the app.
+    const snapshot = await getDocFromServer(configRef).catch(() => getDoc(configRef));
     if (!snapshot.exists()) {
       // Initialize with local placeholder to avoid app crash.
       const initial: AppConfig = { officeLocation: OFFICE_LOCATION, updatedAt: serverTimestamp() };
