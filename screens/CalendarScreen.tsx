@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, useColorScheme, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TextInput, useColorScheme, View } from 'react-native';
 
 import { AttendanceCalendar } from '../components/AttendanceCalendar';
 import { DayStatusModal } from '../components/DayStatusModal';
@@ -10,7 +10,7 @@ import { addMonths, eachDay, isWeekend, toDateKey } from '../utils/date';
 import { getTheme, isDarkResolved, palette } from '../utils/theme';
 
 export const CalendarScreen: React.FC = () => {
-  const { records, setManualStatus, clearStatus, settings } = useAttendance();
+  const { records, setManualStatus, clearStatus, settings, refresh } = useAttendance();
   const systemScheme = useColorScheme();
   const theme = getTheme(isDarkResolved(settings.themeMode, systemScheme));
   const currentMonth = useMemo(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1), []);
@@ -19,6 +19,16 @@ export const CalendarScreen: React.FC = () => {
   const [month, setMonth] = useState(currentMonth);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [startDateInput, setStartDateInput] = useState(`${new Date().getFullYear()}-01-01`);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const onPullToRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refresh]);
 
   const overallStats = useMemo(() => {
     const parsed = /^(\d{4})-(\d{2})-(\d{2})$/.exec(startDateInput);
@@ -58,7 +68,17 @@ export const CalendarScreen: React.FC = () => {
         : palette.leave;
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.background }]}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={onPullToRefresh}
+          tintColor={theme.text}
+        />
+      }
+    >
       <AppCard theme={theme}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Overall Attendance (Till Date)</Text>
         <Text style={[styles.helpText, { color: theme.mutedText }]}>

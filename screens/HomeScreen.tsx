@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -13,7 +13,7 @@ import { addMonths, toDateKey } from '../utils/date';
 import { getTheme, isDarkResolved, palette } from '../utils/theme';
 
 export const HomeScreen: React.FC = () => {
-  const { records, setManualStatus, clearStatus, getMonthlyStats, settings } = useAttendance();
+  const { records, setManualStatus, clearStatus, getMonthlyStats, settings, refresh } = useAttendance();
   const systemScheme = useColorScheme();
   const theme = getTheme(isDarkResolved(settings.themeMode, systemScheme));
   const currentMonth = useMemo(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1), []);
@@ -22,6 +22,16 @@ export const HomeScreen: React.FC = () => {
   const [month, setMonth] = useState(currentMonth);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showFormulaModal, setShowFormulaModal] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const onPullToRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refresh]);
 
   const stats = getMonthlyStats(month);
   const percentageColor =
@@ -32,7 +42,17 @@ export const HomeScreen: React.FC = () => {
         : palette.leave;
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.background }]}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={onPullToRefresh}
+          tintColor={theme.text}
+        />
+      }
+    >
       <Animated.View entering={FadeInDown.duration(260)}>
         <AppCard theme={theme} style={styles.percentCard}>
           <Pressable style={styles.infoButton} onPress={() => setShowFormulaModal(true)}>

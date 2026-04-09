@@ -6,6 +6,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
 
 import { AttendanceProvider, useAttendance } from './contexts/AttendanceContext';
 import { AuthScreen } from './screens/auth/AuthScreen';
@@ -36,6 +37,26 @@ const RootTabs = () => {
   useEffect(() => {
     configureNotifications();
   }, []);
+
+  useEffect(() => {
+    const onNotification = async (notification: Notifications.Notification): Promise<void> => {
+      const title = notification.request.content.title?.toLowerCase() ?? '';
+      if (!title.includes('attendance')) return;
+      await refresh();
+    };
+
+    const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
+      void onNotification(notification);
+    });
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      void onNotification(response.notification);
+    });
+
+    return () => {
+      receivedSub.remove();
+      responseSub.remove();
+    };
+  }, [refresh]);
 
   useEffect(() => {
     if (lastTrackingSignatureRef.current === trackingSignature) return;
