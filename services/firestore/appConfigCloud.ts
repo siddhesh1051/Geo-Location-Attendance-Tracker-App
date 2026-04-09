@@ -1,4 +1,4 @@
-import { doc, getDoc, getDocFromServer, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 
 import { OFFICE_LOCATION } from '../location/constants';
 import { firestore } from '../firebase/firebase';
@@ -126,4 +126,48 @@ export const loadAppConfig = async (): Promise<AppConfig> => {
     console.warn('Failed to load config/app from Firestore, using fallback office location.', error);
     return { officeLocation: OFFICE_LOCATION };
   }
+};
+
+const parseAppConfigSnapshot = (data: unknown): AppConfig => {
+  const snapshotData = (data ?? {}) as Partial<AppConfig> & {
+    officeLocation?: unknown;
+    location?: unknown;
+    latitude?: unknown;
+    longitude?: unknown;
+    lat?: unknown;
+    lng?: unknown;
+    long?: unknown;
+    radius?: number;
+    officeRadius?: number;
+    updatedAt?: unknown;
+  };
+  const mergedRootCandidate = {
+    latitude: snapshotData.latitude ?? snapshotData.lat,
+    longitude: snapshotData.longitude ?? snapshotData.lng ?? snapshotData.long,
+    radius: snapshotData.radius ?? snapshotData.officeRadius,
+  };
+
+  return {
+    officeLocation: normalizeOfficeLocation(
+      snapshotData.officeLocation ?? snapshotData.location ?? mergedRootCandidate,
+      snapshotData.radius ?? snapshotData.officeRadius
+    ),
+    updatedAt: snapshotData.updatedAt,
+  };
+};
+
+export const subscribeAppConfig = (onChange: (config: AppConfig) => void): (() => void) => {
+  return onSnapshot(
+    configRef,
+    (snap) => {
+      if (!snap.exists()) {
+        onChange({ officeLocation: OFFICE_LOCATION });
+        return;
+      }
+      onChange(parseAppConfigSnapshot(snap.data()));
+    },
+    () => {
+      // If listener errors, keep current config (no-op).
+    }
+  );
 };

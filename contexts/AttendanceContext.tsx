@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
 import { AppState } from 'react-native';
 
@@ -14,7 +14,7 @@ import {
   saveSettings,
   setDayStatus,
 } from '../storage/attendanceStorage';
-import { loadAppConfig } from '../services/firestore/appConfigCloud';
+import { loadAppConfig, subscribeAppConfig } from '../services/firestore/appConfigCloud';
 import { loadCloudAttendance, saveCloudAttendance } from '../services/firestore/attendanceCloud';
 import { toDateKey, eachDay, isWeekend, monthEnd, monthStart } from '../utils/date';
 import { AppSettings, AttendanceMap, AttendanceStatus, ThemeMode } from '../utils/types';
@@ -48,6 +48,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [records, setRecords] = useState<AttendanceMap>({});
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [loading, setLoading] = useState(true);
+  const settingsRef = useRef<AppSettings>(defaultSettings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   const syncCloud = useCallback(
     async (nextRecords: AttendanceMap, nextSettings: AppSettings) => {
@@ -92,6 +96,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
     bootstrap();
   }, [refresh, isSignedIn, userId]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeAppConfig((config) => {
+      setSettings((prev) => ({ ...prev, officeLocation: config.officeLocation }));
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', async (state) => {
