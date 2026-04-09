@@ -22,6 +22,9 @@ const notifyPresent = async () => {
       content: {
         title: 'Attendance Updated',
         body: 'You are marked Present for today.',
+        data: {
+          type: 'attendance_marked',
+        },
       },
       trigger: {
         channelId: 'attendance-status',

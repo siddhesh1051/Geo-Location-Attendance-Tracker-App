@@ -10,7 +10,7 @@ import { addMonths, eachDay, isWeekend, toDateKey } from '../utils/date';
 import { getTheme, isDarkResolved, palette } from '../utils/theme';
 
 export const CalendarScreen: React.FC = () => {
-  const { records, setManualStatus, clearStatus, settings, refresh } = useAttendance();
+  const { records, setManualStatus, clearStatus, settings, refresh, lastRefreshedAt } = useAttendance();
   const systemScheme = useColorScheme();
   const theme = getTheme(isDarkResolved(settings.themeMode, systemScheme));
   const currentMonth = useMemo(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1), []);
@@ -71,6 +71,7 @@ export const CalendarScreen: React.FC = () => {
     <ScrollView
       style={[styles.container, { backgroundColor: theme.background }]}
       contentContainerStyle={styles.content}
+      alwaysBounceVertical
       refreshControl={
         <RefreshControl
           refreshing={isRefreshing}
@@ -81,6 +82,9 @@ export const CalendarScreen: React.FC = () => {
     >
       <AppCard theme={theme}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Overall Attendance (Till Date)</Text>
+        <Text style={[styles.syncText, { color: theme.mutedText }]}>
+          Last updated: {lastRefreshedAt ? new Date(lastRefreshedAt).toLocaleTimeString() : '-'}
+        </Text>
         <Text style={[styles.helpText, { color: theme.mutedText }]}>
           Enter your attendance start date (YYYY-MM-DD)
         </Text>
@@ -174,8 +178,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  syncText: {
+    marginTop: 4,
+    marginBottom: 10,
+    fontSize: 12,
+  },
   helpText: {
-    marginTop: 6,
     marginBottom: 10,
     fontSize: 12,
   },

@@ -23,7 +23,7 @@ import './services/location/backgroundTasks';
 const Tab = createBottomTabNavigator();
 
 const RootTabs = () => {
-  const { loading, settings } = useAttendance();
+  const { loading, settings, refresh } = useAttendance();
   const systemScheme = useColorScheme();
   const isDark = isDarkResolved(settings.themeMode, systemScheme);
   const theme = getTheme(isDark);
@@ -40,6 +40,11 @@ const RootTabs = () => {
 
   useEffect(() => {
     const onNotification = async (notification: Notifications.Notification): Promise<void> => {
+      const type = notification.request.content.data?.type;
+      if (type === 'attendance_marked') {
+        await refresh();
+        return;
+      }
       const title = notification.request.content.title?.toLowerCase() ?? '';
       if (!title.includes('attendance')) return;
       await refresh();
@@ -56,6 +61,13 @@ const RootTabs = () => {
       receivedSub.remove();
       responseSub.remove();
     };
+  }, [refresh]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      void refresh();
+    }, 15000);
+    return () => clearInterval(intervalId);
   }, [refresh]);
 
   useEffect(() => {

@@ -32,6 +32,7 @@ type AttendanceContextValue = {
   records: AttendanceMap;
   settings: AppSettings;
   loading: boolean;
+  lastRefreshedAt: string | null;
   setManualStatus: (dateKey: string, status: AttendanceStatus) => Promise<void>;
   clearStatus: (dateKey: string) => Promise<void>;
   refresh: () => Promise<void>;
@@ -48,10 +49,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [records, setRecords] = useState<AttendanceMap>({});
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [loading, setLoading] = useState(true);
-  const settingsRef = useRef<AppSettings>(defaultSettings);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
+  const recordsRef = useRef<AttendanceMap>({});
+  const refreshInFlightRef = useRef<Promise<void> | null>(null);
+  const lastRefreshAtMsRef = useRef(0);
   useEffect(() => {
-    settingsRef.current = settings;
-  }, [settings]);
+    recordsRef.current = records;
+  }, [records]);
 
   const syncCloud = useCallback(
     async (nextRecords: AttendanceMap, nextSettings: AppSettings) => {
@@ -62,14 +66,39 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   );
 
   const refresh = useCallback(async () => {
-    const [updatedRecords, updatedSettings, appConfig] = await Promise.all([
-      applyDefaultWFHForPastWorkingDays(),
-      getSettings(),
-      loadAppConfig(),
-    ]);
-    setRecords(updatedRecords);
-    setSettings({ ...updatedSettings, officeLocation: appConfig.officeLocation });
-  }, []);
+    const nowMs = Date.now();
+    if (refreshInFlightRef.current) {
+      await refreshInFlightRef.current;
+      return;
+    }
+    if (nowMs - lastRefreshAtMsRef.current < 1200) return;
+
+    const run = (async () => {
+      const [updatedRecords, updatedSettings, appConfig] = await Promise.all([
+        applyDefaultWFHForPastWorkingDays(),
+        getSettings(),
+        loadAppConfig(),
+      ]);
+      const nextSettings = { ...updatedSettings, officeLocation: appConfig.officeLocation };
+      setRecords(updatedRecords);
+      setSettings(nextSettings);
+      setLastRefreshedAt(new Date().toISOString());
+
+      // Background geofence writes can update local storage outside React state.
+      // If refresh detects a change, mirror it to cloud for cross-device consistency.
+      if (isSignedIn && userId && JSON.stringify(recordsRef.current) !== JSON.stringify(updatedRecords)) {
+        await saveCloudAttendance(userId, updatedRecords, nextSettings);
+      }
+      lastRefreshAtMsRef.current = Date.now();
+    })();
+
+    refreshInFlightRef.current = run;
+    try {
+      await run;
+    } finally {
+      refreshInFlightRef.current = null;
+    }
+  }, [isSignedIn, userId]);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -92,6 +121,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setRecords(nextRecords);
       setSettings(nextSettings);
       await refresh();
+      setLastRefreshedAt(new Date().toISOString());
       setLoading(false);
     };
     bootstrap();
@@ -195,6 +225,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       records,
       settings,
       loading,
+      lastRefreshedAt,
       setManualStatus,
       clearStatus,
       refresh,
@@ -203,7 +234,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       simulateAutoPresent,
       getMonthlyStats,
     }),
-    [records, settings, loading, setManualStatus, clearStatus, refresh, setThemeMode, resetData, simulateAutoPresent, getMonthlyStats]
+    [records, settings, loading, lastRefreshedAt, setManualStatus, clearStatus, refresh, setThemeMode, resetData, simulateAutoPresent, getMonthlyStats]
   );
 
   return <AttendanceContext.Provider value={value}>{children}</AttendanceContext.Provider>;

@@ -13,7 +13,7 @@ import { addMonths, toDateKey } from '../utils/date';
 import { getTheme, isDarkResolved, palette } from '../utils/theme';
 
 export const HomeScreen: React.FC = () => {
-  const { records, setManualStatus, clearStatus, getMonthlyStats, settings, refresh } = useAttendance();
+  const { records, setManualStatus, clearStatus, getMonthlyStats, settings, refresh, lastRefreshedAt } = useAttendance();
   const systemScheme = useColorScheme();
   const theme = getTheme(isDarkResolved(settings.themeMode, systemScheme));
   const currentMonth = useMemo(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1), []);
@@ -45,6 +45,7 @@ export const HomeScreen: React.FC = () => {
     <ScrollView
       style={[styles.container, { backgroundColor: theme.background }]}
       contentContainerStyle={styles.content}
+      alwaysBounceVertical
       refreshControl={
         <RefreshControl
           refreshing={isRefreshing}
@@ -68,6 +69,9 @@ export const HomeScreen: React.FC = () => {
         <StatCard label="WFH" value={stats.wfh} color={palette.wfh} theme={theme} />
         <StatCard label="Leave" value={stats.leave} color={palette.leave} theme={theme} />
       </View>
+      <Text style={[styles.lastSyncedText, { color: theme.mutedText }]}>
+        Last updated: {lastRefreshedAt ? new Date(lastRefreshedAt).toLocaleTimeString() : '-'}
+      </Text>
 
       <AttendanceCalendar
         month={month}
@@ -149,6 +153,10 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     gap: 12,
+  },
+  lastSyncedText: {
+    marginTop: -4,
+    fontSize: 12,
   },
   modalOverlay: {
     flex: 1,
