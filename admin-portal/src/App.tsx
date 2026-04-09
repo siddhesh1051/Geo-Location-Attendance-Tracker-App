@@ -17,9 +17,25 @@ const parseAdminEmails = (raw: string | undefined): string[] =>
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean);
 
+const parseLngLat = (raw: string): { longitude: number; latitude: number } | null => {
+  const parts = raw
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (parts.length !== 2) return null;
+  const longitude = Number(parts[0]);
+  const latitude = Number(parts[1]);
+  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return null;
+  if (longitude < -180 || longitude > 180) return null;
+  if (latitude < -90 || latitude > 90) return null;
+  return { longitude, latitude };
+};
+
 const OfficeForm = () => {
   const { user } = useUser();
   const [form, setForm] = useState<OfficeLocation>(defaultOffice);
+  const [lngLatInput, setLngLatInput] = useState<string>('');
+  const [lngLatError, setLngLatError] = useState<string>('');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveMessage, setSaveMessage] = useState<string>('');
@@ -49,13 +65,22 @@ const OfficeForm = () => {
     setSaveState('saving');
     setSaveMessage('');
     try {
-      if (!Number.isFinite(form.latitude) || !Number.isFinite(form.longitude)) {
+      let officeToSave = form;
+      if (lngLatInput.trim()) {
+        const parsed = parseLngLat(lngLatInput.trim());
+        if (!parsed) {
+          throw new Error('Coordinate format must be "longitude, latitude" (e.g. 77.650476, 12.920719).');
+        }
+        officeToSave = { ...form, latitude: parsed.latitude, longitude: parsed.longitude };
+        setForm(officeToSave);
+      }
+      if (!Number.isFinite(officeToSave.latitude) || !Number.isFinite(officeToSave.longitude)) {
         throw new Error('Latitude and longitude must be valid numbers.');
       }
-      if (form.radius <= 0) {
+      if (officeToSave.radius <= 0) {
         throw new Error('Radius must be greater than 0.');
       }
-      await writeOfficeLocation(form);
+      await writeOfficeLocation(officeToSave);
       setSaveState('saved');
       setSaveMessage('Office location updated successfully.');
       setLastUpdatedAt(new Date().toLocaleString());
@@ -63,6 +88,16 @@ const OfficeForm = () => {
       setSaveState('error');
       setSaveMessage(error instanceof Error ? error.message : 'Unable to save config');
     }
+  };
+
+  const applyLngLat = () => {
+    setLngLatError('');
+    const parsed = parseLngLat(lngLatInput.trim());
+    if (!parsed) {
+      setLngLatError('Use "longitude, latitude" format (e.g. 77.650476, 12.920719).');
+      return;
+    }
+    setForm((prev) => ({ ...prev, latitude: parsed.latitude, longitude: parsed.longitude }));
   };
 
   if (!isAllowed) {
@@ -79,6 +114,24 @@ const OfficeForm = () => {
       <h2>Office Location Admin</h2>
       <p className="muted">Updates Firestore `config/app.officeLocation` used by the mobile app.</p>
       <form onSubmit={onSubmit} className="form">
+        <label>
+          Coordinates (longitude, latitude)
+          <input
+            type="text"
+            placeholder="77.650476, 12.920719"
+            value={lngLatInput}
+            onChange={(e) => {
+              setLngLatInput(e.target.value);
+              if (lngLatError) setLngLatError('');
+            }}
+          />
+        </label>
+        <div className="actions">
+          <button type="button" className="ghost" onClick={applyLngLat}>
+            Apply Coordinates
+          </button>
+        </div>
+        {lngLatError ? <p className="error">{lngLatError}</p> : null}
         <label>
           Latitude
           <input
