@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp } from 'firebase/app';
-import { doc, getDoc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
+import { GeoPoint, doc, getDoc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 
 export type OfficeLocation = {
   latitude: number;
@@ -42,13 +42,23 @@ export const readOfficeLocation = async (): Promise<OfficeLocation | null> => {
   if (!snap.exists()) return null;
   const data = snap.data() as Record<string, unknown>;
   const raw = (data.officeLocation ?? data.location ?? data) as Record<string, unknown>;
+  const point = (raw.point ?? raw.geopoint ?? raw.location ?? {}) as Record<string, unknown>;
   const latitude =
-    toNumber(raw.latitude) ?? toNumber(raw.lat) ?? toNumber((raw.point as Record<string, unknown>)?.latitude);
+    toNumber(raw.latitude) ??
+    toNumber(raw.lat) ??
+    toNumber(point.latitude) ??
+    toNumber(point._latitude) ??
+    toNumber(point._lat) ??
+    toNumber(point.lat);
   const longitude =
     toNumber(raw.longitude) ??
     toNumber(raw.lng) ??
     toNumber(raw.long) ??
-    toNumber((raw.point as Record<string, unknown>)?.longitude);
+    toNumber(point.longitude) ??
+    toNumber(point._longitude) ??
+    toNumber(point._long) ??
+    toNumber(point.lng) ??
+    toNumber(point.long);
   const radius = toNumber(raw.radius) ?? toNumber(raw.officeRadius) ?? toNumber(data.radius) ?? 150;
 
   if (latitude === undefined || longitude === undefined) return null;
@@ -59,8 +69,11 @@ export const writeOfficeLocation = async (officeLocation: OfficeLocation): Promi
   await setDoc(
     configRef,
     {
-      officeLocation,
-      updatedAt: serverTimestamp(),
+      officeLocation: {
+        point: new GeoPoint(officeLocation.latitude, officeLocation.longitude),
+        radius: officeLocation.radius,
+        updatedAt: serverTimestamp(),
+      },
     },
     { merge: true }
   );

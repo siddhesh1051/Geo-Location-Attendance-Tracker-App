@@ -1,6 +1,7 @@
 import { useClerk } from '@clerk/clerk-expo';
+import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -10,11 +11,118 @@ import { useAttendance } from '../contexts/AttendanceContext';
 import { getTheme, isDarkResolved } from '../utils/theme';
 import { ThemeMode } from '../utils/types';
 
+const toRadians = (value: number): number => (value * Math.PI) / 180;
+
+const calculateDistanceInMeters = (
+  from: { latitude: number; longitude: number },
+  to: { latitude: number; longitude: number }
+): number => {
+  const earthRadius = 6371000;
+  const dLat = toRadians(to.latitude - from.latitude);
+  const dLng = toRadians(to.longitude - from.longitude);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRadians(from.latitude)) * Math.cos(toRadians(to.latitude)) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadius * c;
+};
+
+const formatDistance = (meters: number): string => {
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${(meters / 1000).toFixed(2)} km`;
+};
+
 export const SettingsScreen: React.FC = () => {
   const { signOut } = useClerk();
   const { settings, setThemeMode, resetData, simulateAutoPresent } = useAttendance();
   const systemScheme = useColorScheme();
   const theme = getTheme(isDarkResolved(settings.themeMode, systemScheme));
+  const [distanceMeters, setDistanceMeters] = useState<number | null>(null);
+  const [distanceError, setDistanceError] = useState<string | null>(null);
+  const [distanceLoading, setDistanceLoading] = useState<boolean>(false);
+
+  const updateDistanceFromCoords = useCallback(
+    (latitude: number, longitude: number) => {
+      const meters = calculateDistanceInMeters(
+        { latitude, longitude },
+        {
+          latitude: settings.officeLocation.latitude,
+          longitude: settings.officeLocation.longitude,
+        }
+      );
+      setDistanceMeters(meters);
+    },
+    [settings.officeLocation.latitude, settings.officeLocation.longitude]
+  );
+
+  const loadDistance = useCallback(async () => {
+    setDistanceLoading(true);
+    setDistanceError(null);
+    try {
+      if (Platform.OS === 'web') {
+        throw new Error('Distance is not available on web.');
+      }
+      const permissions = await Location.requestForegroundPermissionsAsync();
+      if (permissions.status !== 'granted') {
+        throw new Error('Location permission is required to show distance.');
+      }
+      const current = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      updateDistanceFromCoords(current.coords.latitude, current.coords.longitude);
+    } catch (error) {
+      setDistanceMeters(null);
+      setDistanceError(error instanceof Error ? error.message : 'Unable to compute distance');
+    } finally {
+      setDistanceLoading(false);
+    }
+  }, [updateDistanceFromCoords]);
+
+  useEffect(() => {
+    loadDistance();
+  }, [loadDistance]);
+
+  useEffect(() => {
+    let mounted = true;
+    let subscription: Location.LocationSubscription | null = null;
+
+    const startWatching = async () => {
+      try {
+        if (Platform.OS === 'web') return;
+        const permissions = await Location.requestForegroundPermissionsAsync();
+        if (permissions.status !== 'granted') return;
+        subscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 4000,
+            distanceInterval: 5,
+          },
+          (position) => {
+            if (!mounted) return;
+            setDistanceLoading(false);
+            setDistanceError(null);
+            updateDistanceFromCoords(position.coords.latitude, position.coords.longitude);
+          }
+        );
+      } catch (error) {
+        if (!mounted) return;
+        setDistanceError(error instanceof Error ? error.message : 'Unable to track location in real time');
+      }
+    };
+
+    startWatching();
+    return () => {
+      mounted = false;
+      subscription?.remove();
+    };
+  }, [updateDistanceFromCoords]);
+
+  const distanceText = useMemo(() => {
+    if (distanceLoading) return 'Calculating...';
+    if (distanceError) return distanceError;
+    if (distanceMeters === null) return '-';
+    return formatDistance(distanceMeters);
+  }, [distanceError, distanceLoading, distanceMeters]);
 
   const themeModes: Array<{ key: ThemeMode; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
     { key: 'light', label: 'Light', icon: 'sunny-outline' },
@@ -35,6 +143,13 @@ export const SettingsScreen: React.FC = () => {
         <Text style={[styles.inputLabel, { color: theme.mutedText }]}>
           Radius (m): <Text style={{ color: theme.text }}>{settings.officeLocation.radius}</Text>
         </Text>
+        <Text style={[styles.inputLabel, { color: theme.mutedText }]}>
+          Distance from current location:{' '}
+          <Text style={{ color: distanceError ? theme.leave : theme.text }}>{distanceText}</Text>
+        </Text>
+        <Pressable onPress={loadDistance} style={styles.distanceRefreshButton}>
+          <Text style={[styles.distanceRefreshText, { color: theme.text }]}>Refresh distance</Text>
+        </Pressable>
       </AppCard>
 
       <AppCard theme={theme} style={styles.sectionCard}>
@@ -152,6 +267,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 4,
     marginLeft: 2,
+  },
+  distanceRefreshButton: {
+    marginTop: 4,
+    marginLeft: 2,
+    alignSelf: 'flex-start',
+    paddingVertical: 2,
+  },
+  distanceRefreshText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   sectionCard: {
     marginTop: 12,
