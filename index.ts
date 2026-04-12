@@ -1,3 +1,8 @@
+import 'expo-task-manager';
+// Background geofence/location tasks must register before any UI import so cold
+// starts and headless wake-ups can execute the handlers (Expo Location + TaskManager).
+import './services/location/backgroundTasks';
+
 import { registerRootComponent } from 'expo';
 
 import App from './App';

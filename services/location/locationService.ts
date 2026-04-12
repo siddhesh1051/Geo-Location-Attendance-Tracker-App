@@ -67,6 +67,14 @@ export const startAttendanceTracking = async (office: OfficeLocation): Promise<b
     deferredUpdatesInterval: 1000 * 60 * 10,
     pausesUpdatesAutomatically: true,
     showsBackgroundLocationIndicator: false,
+    ...(Platform.OS === 'android'
+      ? {
+          foregroundService: {
+            notificationTitle: 'Razor Attendance',
+            notificationBody: 'Detecting office arrival for attendance.',
+          },
+        }
+      : {}),
   });
   return true;
 };

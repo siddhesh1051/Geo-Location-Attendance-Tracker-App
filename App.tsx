@@ -18,7 +18,6 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { clerkPublishableKey, isClerkConfigured } from './services/auth/clerkConfig';
 import { tokenCache } from './services/auth/tokenCache';
 import { getTheme, isDarkResolved } from './utils/theme';
-import './services/location/backgroundTasks';
 
 const Tab = createBottomTabNavigator();
 
