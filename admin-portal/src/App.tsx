@@ -11,6 +11,11 @@ const defaultOffice: OfficeLocation = {
   radius: 150,
 };
 
+const coordinatePresets = [
+  { label: 'Razorpay', longitude: 77.610268, latitude: 12.93725 },
+  { label: 'VJL', longitude: 77.650476, latitude: 12.920719 },
+] as const;
+
 const parseAdminEmails = (raw: string | undefined): string[] =>
   (raw ?? '')
     .split(',')
@@ -100,6 +105,16 @@ const OfficeForm = () => {
     setForm((prev) => ({ ...prev, latitude: parsed.latitude, longitude: parsed.longitude }));
   };
 
+  const applyPreset = (preset: (typeof coordinatePresets)[number]) => {
+    setLngLatError('');
+    setLngLatInput(`${preset.longitude}, ${preset.latitude}`);
+    setForm((prev) => ({
+      ...prev,
+      latitude: preset.latitude,
+      longitude: preset.longitude,
+    }));
+  };
+
   if (!isAllowed) {
     return (
       <div className="card">
@@ -126,6 +141,18 @@ const OfficeForm = () => {
             }}
           />
         </label>
+        <div className="actions">
+          {coordinatePresets.map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              className="ghost"
+              onClick={() => applyPreset(preset)}
+            >
+              Use {preset.label}
+            </button>
+          ))}
+        </div>
         <div className="actions">
           <button type="button" className="ghost" onClick={applyLngLat}>
             Apply Coordinates

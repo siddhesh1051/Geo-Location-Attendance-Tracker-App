@@ -60,22 +60,19 @@ export const startAttendanceTracking = async (office: OfficeLocation): Promise<b
   };
 
   await Location.startGeofencingAsync(GEOFENCE_TASK, [region]);
-  await Location.startLocationUpdatesAsync(LOCATION_TASK, {
-    accuracy: Location.Accuracy.Balanced,
-    distanceInterval: 120,
-    deferredUpdatesDistance: 200,
-    deferredUpdatesInterval: 1000 * 60 * 10,
-    pausesUpdatesAutomatically: true,
-    showsBackgroundLocationIndicator: false,
-    ...(Platform.OS === 'android'
-      ? {
-          foregroundService: {
-            notificationTitle: 'Razor Attendance',
-            notificationBody: 'Detecting office arrival for attendance.',
-          },
-        }
-      : {}),
-  });
+
+  // Android foreground location updates require a persistent system notification.
+  // Keep Android tracking silent by relying on geofencing only.
+  if (Platform.OS !== 'android') {
+    await Location.startLocationUpdatesAsync(LOCATION_TASK, {
+      accuracy: Location.Accuracy.Balanced,
+      distanceInterval: 120,
+      deferredUpdatesDistance: 200,
+      deferredUpdatesInterval: 1000 * 60 * 10,
+      pausesUpdatesAutomatically: true,
+      showsBackgroundLocationIndicator: false,
+    });
+  }
   return true;
 };
 
