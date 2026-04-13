@@ -31,6 +31,25 @@ export const isWeekend = (date: Date): boolean => {
   return day === 0 || day === 6;
 };
 
+// Mandatory company holidays for 2026 from admin-provided calendar.
+export const MANDATORY_HOLIDAY_KEYS_2026 = new Set<string>([
+  '2026-01-01', // New Year
+  '2026-01-26', // Republic Day
+  '2026-03-04', // Holi
+  '2026-05-01', // May Day / Buddha Pournima
+  '2026-09-14', // Ganesh Chaturthi
+  '2026-10-02', // Gandhi Jayanti
+  '2026-10-21', // Dussehra / Vijaya Dashami
+  '2026-11-09', // Diwali
+  '2026-12-25', // Christmas
+]);
+
+export const isMandatoryHoliday = (date: Date): boolean =>
+  MANDATORY_HOLIDAY_KEYS_2026.has(toDateKey(date));
+
+export const isNonWorkingDay = (date: Date): boolean =>
+  isWeekend(date) || isMandatoryHoliday(date);
+
 export const isSameMonth = (a: Date, b: Date): boolean =>
   a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
 

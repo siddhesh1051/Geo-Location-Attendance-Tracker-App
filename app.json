@@ -18,6 +18,7 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Attendance Tracker needs your location to mark office attendance.",
+        "NSLocationAlwaysUsageDescription": "Attendance Tracker uses background location to detect office entry automatically.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Attendance Tracker uses background location to detect office entry automatically.",
         "UIBackgroundModes": [
           "location"

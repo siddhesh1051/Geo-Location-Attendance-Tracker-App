@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { eachDay, getTodayISTKey, isWeekend, monthEnd, monthStart, toDateKey } from '../utils/date';
+import { eachDay, getTodayISTKey, isNonWorkingDay, monthEnd, monthStart, toDateKey } from '../utils/date';
 import { getStatusColor, ThemePalette } from '../utils/theme';
 import { AttendanceMap } from '../utils/types';
 import { AppCard } from './ui/AppCard';
@@ -43,11 +43,11 @@ export const AttendanceCalendar: React.FC<Props> = ({
     days.forEach((date) => {
       const key = toDateKey(date);
       const record = records[key];
-      const weekend = isWeekend(date);
+      const nonWorkingDay = isNonWorkingDay(date);
       const isFutureInIST = key > todayISTKey;
       const isTodayInIST = key === todayISTKey;
-      const isDisabled = isFutureInIST || weekend;
-      const resolvedStatus = weekend
+      const isDisabled = isFutureInIST || nonWorkingDay;
+      const resolvedStatus = nonWorkingDay
         ? 'weekend'
         : (record?.status ?? (!isFutureInIST ? 'unset' : undefined));
       const color = getStatusColor(resolvedStatus, theme);
@@ -105,6 +105,7 @@ export const AttendanceCalendar: React.FC<Props> = ({
     <Animated.View entering={FadeInDown.duration(260)}>
       <AppCard theme={theme} style={styles.wrapper}>
         <Calendar
+          key={`${theme.background}-${theme.text}`}
           current={toDateKey(start)}
           minDate={toDateKey(minMonth)}
           maxDate={toDateKey(new Date(maxMonth.getFullYear(), maxMonth.getMonth() + 1, 0))}
@@ -112,8 +113,8 @@ export const AttendanceCalendar: React.FC<Props> = ({
           onDayPress={(d) => {
             const key = `${d.year}-${`${d.month}`.padStart(2, '0')}-${`${d.day}`.padStart(2, '0')}`;
             const day = new Date(d.year, d.month - 1, d.day);
-            const weekend = isWeekend(day);
-            if (key > todayISTKey || weekend) return;
+            const nonWorkingDay = isNonWorkingDay(day);
+            if (key > todayISTKey || nonWorkingDay) return;
             onDayPress(new Date(d.year, d.month - 1, d.day));
           }}
           markedDates={markedDates}

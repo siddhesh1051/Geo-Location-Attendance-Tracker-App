@@ -33,6 +33,34 @@ npm run start
 
 Then open in Expo Go or emulator.
 
+## EAS Preview Builds
+
+Before building, make sure EAS is configured and env vars are available for cloud builds:
+
+```bash
+eas login
+eas whoami
+eas env:create --name EXPO_PUBLIC_FIREBASE_API_KEY --value "<value>" --scope project
+eas env:create --name EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN --value "<value>" --scope project
+eas env:create --name EXPO_PUBLIC_FIREBASE_PROJECT_ID --value "<value>" --scope project
+eas env:create --name EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET --value "<value>" --scope project
+eas env:create --name EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID --value "<value>" --scope project
+eas env:create --name EXPO_PUBLIC_FIREBASE_APP_ID --value "<value>" --scope project
+eas env:create --name EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY --value "<value>" --scope project
+```
+
+Build commands:
+
+```bash
+npm run build:preview:android
+npm run build:preview:ios
+npm run build:preview:ios:simulator
+```
+
+- `build:preview:ios`: iOS internal distribution build for physical devices.
+- `build:preview:ios:simulator`: iOS simulator build (`.app`) for local simulator testing.
+- For physical iOS preview install, Apple Developer credentials + registered test devices are required.
+
 ## Notes
 
 - Background location reliability depends on OS battery/background policies.
