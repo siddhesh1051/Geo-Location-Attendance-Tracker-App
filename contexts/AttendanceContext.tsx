@@ -15,9 +15,9 @@ import {
   setDayStatus,
 } from '../storage/attendanceStorage';
 import { loadAppConfig, subscribeAppConfig } from '../services/firestore/appConfigCloud';
-import { loadCloudAttendance, saveCloudAttendance } from '../services/firestore/attendanceCloud';
+import { loadCloudAttendance, saveCloudAttendance, subscribeCloudAttendance } from '../services/firestore/attendanceCloud';
 import { toDateKey, eachDay, isWeekend, monthEnd, monthStart } from '../utils/date';
-import { AppSettings, AttendanceMap, AttendanceStatus, ThemeMode } from '../utils/types';
+import { AppSettings, AttendanceMap, AttendanceRecord, AttendanceStatus, ThemeMode } from '../utils/types';
 
 type MonthlyStats = {
   present: number;
@@ -43,6 +43,37 @@ type AttendanceContextValue = {
 };
 
 const AttendanceContext = createContext<AttendanceContextValue | undefined>(undefined);
+
+const parseUpdatedAtMs = (record?: AttendanceRecord): number => {
+  if (!record?.updatedAt) return 0;
+  const ms = Date.parse(record.updatedAt);
+  return Number.isFinite(ms) ? ms : 0;
+};
+
+const chooseLatestRecord = (
+  localRecord?: AttendanceRecord,
+  cloudRecord?: AttendanceRecord
+): AttendanceRecord | undefined => {
+  if (!localRecord) return cloudRecord;
+  if (!cloudRecord) return localRecord;
+
+  const localMs = parseUpdatedAtMs(localRecord);
+  const cloudMs = parseUpdatedAtMs(cloudRecord);
+  if (localMs > cloudMs) return localRecord;
+  if (cloudMs > localMs) return cloudRecord;
+  if (localRecord.manual !== cloudRecord.manual) return localRecord.manual ? localRecord : cloudRecord;
+  return localRecord;
+};
+
+const mergeAttendanceRecords = (localRecords: AttendanceMap, cloudRecords: AttendanceMap): AttendanceMap => {
+  const merged: AttendanceMap = {};
+  const allKeys = new Set([...Object.keys(localRecords), ...Object.keys(cloudRecords)]);
+  allKeys.forEach((key) => {
+    const chosen = chooseLatestRecord(localRecords[key], cloudRecords[key]);
+    if (chosen) merged[key] = chosen;
+  });
+  return merged;
+};
 
 export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isSignedIn, userId } = useAuth();
@@ -109,10 +140,14 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (isSignedIn && userId) {
         const cloud = await loadCloudAttendance(userId);
         if (cloud) {
-          nextRecords = cloud.records;
+          nextRecords = mergeAttendanceRecords(savedRecords, cloud.records);
           // Merge per-user settings but keep universal officeLocation from config/app.
           nextSettings = { ...cloud.settings, officeLocation: appConfig.officeLocation };
-          await Promise.all([saveAttendance(nextRecords), saveSettings(nextSettings)]);
+          await Promise.all([
+            saveAttendance(nextRecords),
+            saveSettings(nextSettings),
+            saveCloudAttendance(userId, nextRecords, nextSettings),
+          ]);
         } else {
           await saveCloudAttendance(userId, nextRecords, nextSettings);
         }
@@ -133,6 +168,20 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!isSignedIn || !userId) return;
+    const unsubscribe = subscribeCloudAttendance(userId, (cloud) => {
+      if (!cloud) return;
+      const mergedRecords = mergeAttendanceRecords(recordsRef.current, cloud.records);
+      setRecords(mergedRecords);
+      setSettings((prev) => ({ ...cloud.settings, officeLocation: prev.officeLocation }));
+      setLastRefreshedAt(new Date().toISOString());
+      void saveAttendance(mergedRecords);
+      void saveSettings({ ...cloud.settings, officeLocation: settings.officeLocation });
+    });
+    return unsubscribe;
+  }, [isSignedIn, userId, settings.officeLocation]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', async (state) => {

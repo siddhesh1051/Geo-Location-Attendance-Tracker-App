@@ -26,7 +26,7 @@ export const configureNotifications = async (): Promise<void> => {
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('attendance-status', {
       name: 'Attendance Status',
-      importance: Notifications.AndroidImportance.DEFAULT,
+      importance: Notifications.AndroidImportance.HIGH,
       sound: null,
       vibrationPattern: [0, 120],
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
