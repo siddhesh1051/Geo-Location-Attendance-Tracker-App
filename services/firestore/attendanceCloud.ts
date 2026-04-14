@@ -1,4 +1,4 @@
-import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 import { defaultSettings } from '../../storage/attendanceStorage';
 import { AppSettings, AttendanceMap } from '../../utils/types';
@@ -44,19 +44,3 @@ export const saveCloudAttendance = async (
     { merge: true }
   );
 };
-
-export const subscribeCloudAttendance = (
-  userId: string,
-  onChange: (payload: { records: AttendanceMap; settings: AppSettings } | null) => void
-): (() => void) =>
-  onSnapshot(getUserDocRef(userId), (snapshot) => {
-    if (!snapshot.exists()) {
-      onChange(null);
-      return;
-    }
-    const data = snapshot.data() as CloudAttendanceState;
-    onChange({
-      records: data.records ?? {},
-      settings: { ...defaultSettings, ...(data.settings ?? {}) },
-    });
-  });

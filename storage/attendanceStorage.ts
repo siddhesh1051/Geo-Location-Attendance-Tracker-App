@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { OFFICE_LOCATION } from '../services/location/constants';
-import { getTodayISTKey } from '../utils/date';
+import { toDateKey } from '../utils/date';
 import { AppSettings, AttendanceMap, AttendanceStatus } from '../utils/types';
 
 const ATTENDANCE_KEY = 'attendance_records_v1';
@@ -76,7 +76,7 @@ export const autoMarkPresentToday = async (): Promise<AttendanceMap> => {
 };
 
 export const autoMarkPresentTodayOnce = async (): Promise<{ records: AttendanceMap; didMarkNow: boolean }> => {
-  const key = getTodayISTKey();
+  const key = toDateKey(new Date());
   const current = await getAttendance();
   if (current[key]?.manual) return { records: current, didMarkNow: false };
   if (current[key]?.status === 'present') return { records: current, didMarkNow: false };
